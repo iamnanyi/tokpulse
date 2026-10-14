@@ -1,0 +1,34 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>ZCode Token Speed 本地验证页</title>
+<style>
+:root{color-scheme:light dark;--color-text-tertiary:#777}*{box-sizing:border-box}
+body{margin:0;background:#fafafa;color:#171717;font:14px -apple-system,BlinkMacSystemFont,sans-serif}
+body.dark{background:#202020;color:#eee;--color-text-tertiary:#aaa}
+main{display:flex;flex-direction:column;height:100vh;width:min(760px,100%);margin:auto;padding:24px;gap:16px}
+#messages{flex:1;min-height:0;overflow:auto;padding:12px;border:1px solid #8884;border-radius:12px}
+[data-row-id]{padding:12px}.chat-composer-region{display:block;flex-shrink:0}
+.chat-composer-input-surface{padding:12px;border:1px solid #8885;border-radius:20px;background:#8881}
+[contenteditable]{min-height:42px;outline:none}button{font:inherit;border:0;border-radius:14px;padding:7px 12px;background:#8883}
+.controls{display:flex;justify-content:space-between;gap:8px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+</style>
+<main data-testid="v4-session-pane-main" data-session-id="session-a"><header>ZCode · 布局验证</header>
+<div id="messages">
+<div data-row-id="1"><div data-conversation-selectable="true">历史用户输入</div></div>
+<div data-row-id="2" class="group/assistant-row"><div data-conversation-selectable="true">历史助手消息</div></div>
+<div data-row-id="3" class="group/assistant-row"><div data-conversation-selectable="true"><span id="answer"></span><button>复制</button><span class="sr-only">隐藏说明</span></div></div>
+<div data-row-id="4"><div data-conversation-selectable="true" id="thinking">思考内容不计速</div></div>
+<div data-row-id="5"><div data-testid="mcp-result-surface" id="tool">工具输出不计速</div></div>
+</div>
+<div data-v4-composer-dock="true"><div class="chat-composer-region" data-testid="v4-composer"><div class="chat-composer-input-surface"><div contenteditable="true" data-lexical-editor="true" role="textbox"></div><div class="controls"><button type="button" aria-label="添加上下文">＋</button><button id="submit" type="button" data-testid="v4-send" aria-label="发送">↑</button></div></div></div></div>
+</main>
+<script>
+const fixtureInitialMessages=document.querySelector('#messages').innerHTML;
+window.fixture={
+ start(){document.querySelector('#submit').setAttribute('data-testid','v4-stop');document.querySelector('#submit').setAttribute('aria-label','停止')},
+ stop(){document.querySelector('#submit').setAttribute('data-testid','v4-send');document.querySelector('#submit').setAttribute('aria-label','发送')},
+ append(t){document.querySelector('#answer').append(t)},
+ switch(){document.querySelector('main').setAttribute('data-session-id','session-b');document.querySelector('#messages').innerHTML='<div data-row-id="3" class="group/assistant-row"><div data-conversation-selectable="true" id="answer">另一对话已有消息</div></div>'},
+ switchBack(){document.querySelector('main').setAttribute('data-session-id','session-a');document.querySelector('#messages').innerHTML=fixtureInitialMessages},
+ work(){},
+ geometry(){const rect=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom}};return{viewport:[innerWidth,innerHeight],messages:rect(document.querySelector('#messages')),surface:rect(document.querySelector('.chat-composer-input-surface')),buttons:[...document.querySelectorAll('.controls button')].map(rect),bar:document.querySelector('[data-token-speed-bar]')?rect(document.querySelector('[data-token-speed-bar]')):null}}
+};
+</script></html>

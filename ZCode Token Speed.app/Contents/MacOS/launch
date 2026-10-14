@@ -1,0 +1,5 @@
+#!/bin/zsh
+set -eu
+# Resolve from this bundle so moving/cloning the complete repository stays valid.
+task_root="${0:A:h:h:h:h}"
+exec /bin/zsh -l "$task_root/scripts/launch-zcode-app.zsh" "$task_root" >> "$task_root/zcode-launcher.log" 2>&1

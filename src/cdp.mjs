@@ -1,6 +1,12 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { pathToFileURL } from 'node:url';
 const exec = promisify(execFile);
+export async function appProcess(pid, appPath) {
+  // ZCode changes process.title to "ZCode", so ps command lines lose the executable path.
+  const { stdout } = await exec('/usr/sbin/lsof', ['-a','-p',String(pid),'-d','txt','-Fn']);
+  return stdout.split('\n').some(line => line.startsWith('n' + appPath + '/Contents/MacOS/'));
+}
 export function localWebSocket(value, port) {
   const u = new URL(value);
   if (u.protocol !== 'ws:' || u.hostname !== '127.0.0.1' || Number(u.port) !== port || u.username || u.password || !u.pathname.startsWith('/devtools/')) throw Error('拒绝非本机 CDP WebSocket');
@@ -13,10 +19,10 @@ export async function verifyListener(port, { appPath, test = false } = {}) {
   const names = stdout.split('\n').filter(x=>x.startsWith('n')).map(x=>x.slice(1));
   if (!names.length || names.some(x=>x !== '127.0.0.1:' + port)) throw Error('CDP 监听地址不是唯一的 127.0.0.1，拒绝连接');
   if (!test) {
+    // Keep the original owner selection: auxiliary child processes can inherit the same socket FD.
     const pid = stdout.match(/^p(\d+)$/m)?.[1];
     if (!pid) throw Error('无法核验监听进程');
-    const { stdout: command } = await exec('/bin/ps', ['-p',pid,'-o','command=']);
-    if (!command.trim().startsWith(appPath + '/Contents/MacOS/')) throw Error('CDP 端口不属于指定 App');
+    if (!await appProcess(pid, appPath)) throw Error('CDP 端口不属于指定 App');
   }
 }
 export async function targets(port) {
@@ -24,10 +30,14 @@ export async function targets(port) {
   if (!r.ok) throw Error('CDP 目标列表不可用');
   return r.json();
 }
-export function appTarget(t) {
+export function appTarget(t, config = {}) {
   if (t.type !== 'page') return false;
   try {
     const u = new URL(t.url);
+    if (config.adapter === 'zcode') {
+      return u.protocol === 'file:' && !u.host && !u.hash
+        && u.pathname === pathToFileURL(config.appPath + '/Contents/Resources/app.asar/out/renderer/index.html').pathname;
+    }
     return u.protocol === 'app:' && u.hostname === '-' && ['/index.html','/detached-window.html'].includes(u.pathname)
       && !/avatar-overlay|prewarm/.test(u.search);
   } catch { return false; }

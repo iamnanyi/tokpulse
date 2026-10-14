@@ -1,13 +1,19 @@
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { CDP, appTarget, targets, verifyListener } from './cdp.mjs';
+import { CDP, appTarget, targets, verifyListener, appProcess } from './cdp.mjs';
 import { bundle } from './build.mjs';
 const exec = promisify(execFile);
 const sleep = ms => new Promise(r => setTimeout(r,ms));
 
 export async function appRunning(appPath) {
-  const { stdout } = await exec('/bin/ps',['-axo','command=']);
-  return stdout.split('\n').some(line=>line.startsWith(appPath + '/Contents/MacOS/'));
+  const { stdout } = await exec('/bin/ps',['-axo','pid=,command=']);
+  for (const line of stdout.split('\n')) {
+    const match = line.trim().match(/^(\d+)\s+(.+)$/);
+    if (!match) continue;
+    if (match[2].startsWith(appPath + '/Contents/MacOS/')) return true;
+    if (match[2].trim() === 'ZCode' && await appProcess(match[1], appPath).catch(()=>false)) return true;
+  }
+  return false;
 }
 export function launchApp(config) {
   // Spawn vendor binary directly, leaving signature and resources untouched.
@@ -35,7 +41,7 @@ export async function run(config, { once = false, remove = false } = {}) {
   while (!stopping) {
     try {
       await verifyListener(config.port,{appPath:config.appPath});
-      const list = (await targets(config.port)).filter(appTarget);
+      const list = (await targets(config.port)).filter(t => appTarget(t, config));
       const ids = new Set(list.map(t=>t.id));
       for (const [id,s] of sessions) if (!ids.has(id)) {s.cdp.close();sessions.delete(id);}
       for (const t of list) {

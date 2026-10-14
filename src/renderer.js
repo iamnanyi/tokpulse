@@ -35,11 +35,13 @@ export function installTokenSpeed() {
   }
   function findComposer() {
     return [...document.querySelectorAll('[data-composer-surface-variant]')]
-      .find(e => visible(e) && e.querySelector('[contenteditable="true"],textarea'));
+      .find(e => visible(e) && e.querySelector('[contenteditable="true"],textarea'))
+      ?? [...document.querySelectorAll('[data-testid="v4-composer"] .chat-composer-input-surface')]
+        .find(e => visible(e) && e.querySelector('[contenteditable="true"][data-lexical-editor="true"]'));
   }
   function findHost(e) {
     if (!e) return null;
-    const container = e.closest('form[data-chatgpt-composer],form[data-thread-find-composer],[data-codex-composer-root]');
+    const container = e.closest('form[data-chatgpt-composer],form[data-thread-find-composer],[data-codex-composer-root],[data-testid="v4-composer"]');
     if (!container || !visible(container)) return null;
     const s = getComputedStyle(container);
     // Only known normal-flow layouts. Never wrap/reparent native elements.
@@ -47,12 +49,15 @@ export function installTokenSpeed() {
     return null;
   }
   function findScope(e) {
+    const session = e?.closest('[data-testid^="v4-session-pane-"][data-session-id]');
+    if (session) return session;
     for (let p = e?.parentElement; p && p !== document.body; p = p.parentElement) {
       if (p.querySelector('[data-thread-user-message-navigation-content],[data-content-search-turn-key],[data-chatgpt-conversation-turn],[data-virtualized-turn-content]')) return p;
     }
     return null;
   }
   function routeIdentity(e, root) {
+    if (root?.hasAttribute('data-session-id')) return location.href + '|zcode:' + root.getAttribute('data-session-id') + '|' + root.getAttribute('data-testid');
     const mark = e?.querySelector('[data-above-composer-conversation-id]')
       ?? root?.querySelector('[data-chatgpt-selection-conversation-id],[data-above-composer-conversation-id],[data-map-composer-conversation]');
     const conversation = mark?.getAttribute('data-chatgpt-selection-conversation-id') ?? mark?.getAttribute('data-above-composer-conversation-id') ?? mark?.getAttribute('data-map-composer-conversation');
@@ -61,11 +66,18 @@ export function installTokenSpeed() {
   }
   function active() {
     if (!composer) return false;
+    if (host.matches('[data-testid="v4-composer"]')) return [...host.querySelectorAll('button[data-testid="v4-stop"]')].some(e => visible(e) && !e.disabled);
     // Exact localized composer labels; tool/audio "Stop" controls outside composer never arm the monitor.
     return [...host.querySelectorAll('button[aria-label]')].some(e => visible(e) && !e.disabled && /^(Stop|Stop generation|Stop generating|停止|停止生成|停止响应|停止回答)$/i.test(e.getAttribute('aria-label').trim()));
   }
   function entries() {
     if (!scope) return [];
+    if (scope.hasAttribute('data-session-id')) {
+      const row = [...scope.querySelectorAll('[data-row-id][class~="group/assistant-row"]')]
+        .reverse().find(e => visible(e) && e.closest('[data-session-id]') === scope);
+      const body = row?.querySelector(':scope > [data-conversation-selectable="true"]');
+      return body ? [{ key:row.getAttribute('data-row-id'), text:outputText(body) }] : [];
+    }
     const leaf = [...scope.querySelectorAll('[data-markdown-text-style="assistant-message"], [data-content-search-unit-key]')]
       .reverse().find(e => {
         if (!visible(e) || host.contains(e) || e.closest('[data-user-message-bubble],[data-local-conversation-user-anchor],aside,[role="dialog"]')) return false;
@@ -80,13 +92,16 @@ export function installTokenSpeed() {
     const keyNode = leaf.closest('[data-chatgpt-selection-message-id],[data-content-search-unit-key],[data-dil-message-id]');
     let key = keyNode?.getAttribute('data-chatgpt-selection-message-id') ?? keyNode?.getAttribute('data-content-search-unit-key') ?? keyNode?.getAttribute('data-dil-message-id');
     if (!key) { if (!ids.has(leaf)) ids.set(leaf, ++serial); key = 'node:' + ids.get(leaf); }
+    return [{ key, text:outputText(leaf) }];
+  }
+  function outputText(leaf) {
     const walker = document.createTreeWalker(leaf, NodeFilter.SHOW_TEXT, { acceptNode(n) {
       const p = n.parentElement;
-      return p?.closest('[data-conversation-role],[data-markdown-copy="exclude"],button,script,style,[contenteditable="true"],[hidden],[aria-hidden="true"]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      return p?.closest('[data-conversation-role],[data-markdown-copy="exclude"],button,script,style,[contenteditable="true"],[hidden],[aria-hidden="true"],.sr-only,[data-streamdown="code-block-header"]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
     } });
     let text = '', node;
     while ((node = walker.nextNode())) text += node.textContent;
-    return [{ key, text }];
+    return text;
   }
   function reset(now) { tracker.reset(); speed.reset(now); wasActive = false; measuredThisRun = false; }
   function tick() {
@@ -142,12 +157,12 @@ export function installTokenSpeed() {
   }
   observer = new MutationObserver(schedule);
   observer.observe(document.documentElement, { childList:true, subtree:true, characterData:true, attributes:true,
-    attributeFilter:['aria-label','disabled','hidden','inert','data-talvt-turn-state'] });
+    attributeFilter:['aria-label','disabled','hidden','inert','data-talvt-turn-state','data-session-id','data-testid'] });
   timer = setInterval(tick, 250);
   tick();
   window.__chatgptTokenSpeed = {
-    version:'0.1.2',
-    status:() => ({ mounted:!!bar?.isConnected, active:wasActive, adapter:scope?.querySelector('[data-talvt-turn-state]')?'chatgpt':'codex', label:bar?.textContent ?? null, state:bar?.dataset.tokenSpeedState ?? null }),
+    version:'0.2.0',
+    status:() => ({ mounted:!!bar?.isConnected, active:wasActive, adapter:host?.matches('[data-testid="v4-composer"]')?'zcode':scope?.querySelector('[data-talvt-turn-state]')?'chatgpt':'codex', label:bar?.textContent ?? null, state:bar?.dataset.tokenSpeedState ?? null }),
     dispose() { disposed = true; observer.disconnect(); clearInterval(timer); bar?.remove(); style.remove(); tracker.reset(); lastSpeeds.clear(); delete window.__chatgptTokenSpeed; }
   };
 }

@@ -8,7 +8,8 @@ import { CDP, verifyListener, targets } from '../src/cdp.mjs';
 import { bundle } from '../src/build.mjs';
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const profile=await mkdtemp(path.join(tmpdir(),'token-speed-test-'));
-const fixture=await readFile(new URL('fixture.html',import.meta.url));
+const isZcode=process.argv.includes('--zcode');
+const fixture=await readFile(new URL(isZcode?'zcode-fixture.html':'fixture.html',import.meta.url));
 const server=createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/html;charset=utf-8'});res.end(fixture)});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const url='http://127.0.0.1:'+server.address().port;
@@ -33,6 +34,19 @@ try {
   await cdp.evaluate(code);await wait(100);
   let status=await cdp.evaluate('window.__chatgptTokenSpeed.status()');
   check('idle exact label / existing messages excluded',()=>assert.equal(status.label,'— tok/s'));
+  if(isZcode) {
+    check('ZCode adapter recognized',()=>assert.equal(status.adapter,'zcode'));
+    // Neither a tool Stop nor assistant/history edits can arm an idle composer.
+    await cdp.evaluate(`document.querySelector('#messages').insertAdjacentHTML('beforeend','<button aria-label="Stop" data-testid="v4-stop">Stop tool</button>');fixture.append('历史追加');`);
+    await wait(650);
+    check('tool Stop outside composer and idle edits are excluded',()=>{});
+    assert.equal((await cdp.evaluate('window.__chatgptTokenSpeed.status()')).label,'— tok/s');
+    await cdp.evaluate('fixture.start()');await wait(100);
+    for(let i=0;i<4;i++) {await cdp.evaluate(`document.querySelector('#thinking').append('思考增量');document.querySelector('#tool').append('工具增量');document.querySelector('[contenteditable]').append('用户输入');`);await wait(250)}
+    check('ZCode thinking, tool output and user input never count',()=>{});
+    assert.equal((await cdp.evaluate('window.__chatgptTokenSpeed.status()')).label,'— tok/s');
+    await cdp.evaluate('fixture.stop()');
+  }
   const after=await cdp.evaluate('fixture.geometry()');
   check('normal flow, surface/buttons retain size, no overlap',()=>{
     assert.equal(after.surface.height,initial.surface.height);assert.equal(after.surface.width,initial.surface.width);
@@ -42,7 +56,7 @@ try {
   await cdp.evaluate('fixture.start()');await wait(50);
   for(let i=0;i<5;i++){await cdp.evaluate('fixture.append("正在逐字输出一段测试文字。");');await wait(250)}
   status=await cdp.evaluate('window.__chatgptTokenSpeed.status()');
-  check('Codex fixture streaming has a positive estimated speed',()=>assert.match(status.label,/≈ [\d.]+ tok\/s/));
+  check((isZcode?'ZCode':'Codex')+' fixture streaming has a positive estimated speed',()=>assert.match(status.label,/≈ [\d.]+ tok\/s/));
   // Reproduce the observed Electron state: a visible chat reports document.hidden=true.
   await cdp.evaluate('Object.defineProperty(document,"hidden",{configurable:true,get:()=>true});');
   for(let i=0;i<4;i++){await cdp.evaluate('fixture.append("可见窗口的输出仍应计速。");');await wait(250)}
@@ -57,7 +71,7 @@ try {
   const narrow=await cdp.evaluate('fixture.geometry()');
   check('narrow window and dark theme remain in bounds',()=>{assert.ok(narrow.bar.bottom<=700);assert.ok(narrow.bar.x+narrow.bar.width<=390);assert.ok(narrow.surface.bottom<=narrow.bar.y)});
   const snap=await cdp.call('Page.captureScreenshot',{format:'png'});
-  await writeFile(new URL('../verification-dark-narrow.png',import.meta.url),Buffer.from(snap.data,'base64'));
+  await writeFile(new URL(isZcode?'../verification-zcode-dark-narrow.png':'../verification-dark-narrow.png',import.meta.url),Buffer.from(snap.data,'base64'));
   const beforeStop=(await cdp.evaluate('window.__chatgptTokenSpeed.status()')).label;
   await cdp.evaluate('fixture.stop()');await wait(1600);
   const stopped=await cdp.evaluate('window.__chatgptTokenSpeed.status()');
@@ -70,7 +84,7 @@ try {
   check('returning to the measured conversation restores its speed',()=>{});assert.equal((await cdp.evaluate('window.__chatgptTokenSpeed.status()')).label,beforeStop);
   await cdp.evaluate('fixture.work()');await wait(100);
   for(let i=0;i<5;i++){await cdp.evaluate('fixture.append("Work 输出测试。");');await wait(250)}
-  check('Work static-marker fixture streams',()=>{});assert.match((await cdp.evaluate('window.__chatgptTokenSpeed.status()')).label,/≈ [\d.]+ tok\/s/);
+  check((isZcode?'ZCode subsequent output':'Work static-marker fixture')+' streams',()=>{});assert.match((await cdp.evaluate('window.__chatgptTokenSpeed.status()')).label,/≈ [\d.]+ tok\/s/);
   const beforePause=(await cdp.evaluate('window.__chatgptTokenSpeed.status()')).label;
   await wait(1500);
   const paused=await cdp.evaluate('window.__chatgptTokenSpeed.status()');

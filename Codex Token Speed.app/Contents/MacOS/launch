@@ -1,0 +1,5 @@
+#!/bin/zsh
+set -eu
+# Resolve from this bundle so moving/cloning the complete repository stays valid.
+task_root="${0:A:h:h:h:h}"
+exec /bin/zsh -l "$task_root/scripts/launch-app.zsh" "$task_root" chatgpt >> "$task_root/codex-launcher.log" 2>&1

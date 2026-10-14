@@ -1,6 +1,6 @@
 # TokPulse
 
-自有、无 npm 依赖的 macOS Node.js + CDP 注入器。在聊天输入框下方增加一行输出速度，输出时显示 `≈ 42.6 tok/s`，结束或停顿后保留最近一次测得的速度。当前对话尚无测速记录时显示 `— tok/s`。不使用 ChatGPT 插件，不改安装包、不重新签名。
+自有、无 npm 依赖的 macOS Node.js + CDP 注入器，支持 ChatGPT、Codex 和 ZCode。在聊天输入框下方增加一行输出速度，输出时显示 `≈ 42.6 tok/s`，结束或停顿后保留最近一次测得的速度。当前对话尚无测速记录时显示 `— tok/s`。不使用 ChatGPT 插件，不改安装包、不重新签名。
 
 ## 当前验证边界
 
@@ -15,6 +15,8 @@
 
 需要 Node.js 22 或以上；本机已检测到 Node.js 24.15.0。不需要 `npm install`。
 
+仓库根目录的 **`Codex Token Speed.app`** 可直接双击，也可拖进 Dock。本机 Codex 安装在 `/Applications/ChatGPT.app`，该入口使用 ChatGPT 配置启动它并启用测速。入口按自身位置寻找仓库；请保留完整仓库，整个目录移动后仍可使用。首次打开会安装所需服务，后续打开会唤起它。支持 PATH、Homebrew 和 nvm 中的 Node.js 22+，启动诊断写入仓库内的 `codex-launcher.log`（Git 已忽略日志）。
+
 ```sh
 npm test
 npm run test:browser
@@ -23,7 +25,7 @@ npm run install:auto
 
 为兼容已有安装，系统服务和安装目录继续沿用 ChatGPT Token Speed 名称。安装后，代码复制到 `~/Library/Application Support/ChatGPT Token Speed/app`，LaunchAgent 注册到 `~/Library/LaunchAgents/local.chatgpt-token-speed.plist`。安装脚本不会退出正在工作的 ChatGPT。
 
-**首次启用**：完成当前工作后，使用 `⌘Q` 完全退出 ChatGPT，再双击 `scripts/启动.command`。之后打开/切换对话、新窗口和页面重载，状态栏会自动挂载，不需要在聊天中运行指令。
+**首次启用**：完成当前工作后，使用 `⌘Q` 完全退出 ChatGPT，再双击仓库中的 `Codex Token Speed.app` 或 `scripts/启动.command`。之后打开/切换对话、新窗口和页面重载，状态栏会自动挂载，不需要在聊天中运行指令。
 
 登录 macOS 时，LaunchAgent 会启动注入器。如果此时 App 尚未启动，它会带调试参数启动 App。若 App 已经运行且未启用 CDP，注入器等待，不强制重启。**完全退出后从原始 Dock 图标重新启动，调试参数不会保留**；此时应使用附带的启动脚本。免改安装包的方案无法让原始图标永久携带调试参数。关闭窗口、切换聊天不影响注入。
 
@@ -44,6 +46,36 @@ npm run uninstall
 
 CDP 是 App 的启动参数：关闭注入器不会关闭端口。需要关闭调试端口时，完全退出 App，然后从原始图标启动。`关闭` 只停止本次登录的自动启动；下一次登录会再次加载，永久关闭请卸载。
 
+## ZCode 安装与使用
+
+仓库根目录的 **`ZCode Token Speed.app`** 可直接双击，也可拖进 Dock。入口按自身位置寻找仓库，整个仓库换目录或重新克隆后仍可使用；请保留完整仓库，不要只复制这个 `.app`。首次打开会安装独立自动启动服务，之后打开会启动 ZCode 并唤起服务。支持 PATH、Homebrew 和 nvm 中的 Node.js 22+。启动诊断写入仓库内的 `zcode-launcher.log`（Git 已忽略日志）。
+
+ZCode 使用相同的估算和保留规则，独立占用 `127.0.0.1:9334`，可与 ChatGPT 的 9333 同时运行：
+
+```sh
+npm run install:zcode
+npm run launch:zcode
+npm run doctor:zcode
+```
+
+如果 ZCode 已经运行且未启用 CDP，先完成当前工作，用 `⌘Q` 完全退出，再双击仓库中的 `ZCode Token Speed.app`、执行 `npm run launch:zcode` 或双击 `scripts/ZCode-启动.command`。服务不会强制退出已有 App。手动持续运行用 `npm run start:zcode`。
+
+独立安装位置为 `~/Library/Application Support/ZCode Token Speed`，LaunchAgent 为 `local.zcode-token-speed`，专用启动入口为安装目录内的 `ZCode Token Speed.app`，可拖进 Dock。脚本 `ZCode-安装自动启动.command`、`ZCode-关闭.command`、`ZCode-卸载.command` 分别对应安装、关闭、卸载；命令对应 `npm run install:zcode`、`npm run stop:zcode`、`npm run uninstall:zcode`。这些命令仅操作 ZCode 服务。
+
+自定义 ZCode 安装路径或端口：
+
+```sh
+node src/cli.mjs install --app zcode --config /absolute/zcode-config.json
+```
+
+```json
+{"appPath":"/Applications/ZCode.app","executable":"ZCode","port":9334,"autoLaunch":true}
+```
+
+适配依据本机 ZCode 3.15.3 的 `v4-composer`、Lexical 输入框、`v4-stop`、会话 ID 和助手正文行标记。仅统计当前会话的助手可见正文，思考行、工具行和输入文字不计入。不同 App 的消息正文不会互相读取。ZCode 辅助资源窗口、插件页面和内置浏览器不注入。安装包或 DOM 更新后需复核兼容性。
+
+自动化回归已验证 ZCode 结构测试页的计速、保留、会话切换、重载和清理；隔离真实实例停留在首次引导页，未验证真实 ZCode 流式回答。测试页通过不等于真实回答端到端验证完成。
+
 ## 计速规则和局限
 
 仅在当前输入框的原生“停止 / Stop”按钮出现时计速；工具运行、音频播放等其他位置的停止按钮不会启用计速。只读取最新助手正文的追加文字，不读取输入框、工具输出或隐藏的角色标题。
@@ -59,7 +91,7 @@ CDP 是 App 的启动参数：关闭注入器不会关闭端口。需要关闭�
 ## 本机安全边界
 
 - 启动参数固定 `--remote-debugging-address=127.0.0.1`；连接前用 `lsof` 核验实际监听地址，拒绝 `*`、局域网 IP、IPv6 或混合监听。
-- 核验端口所属进程来自配置的 App；只连接 `app://-/index.html` 和 detached window，排除浏览器、MCP、头像、预热页面。
+- 核验端口所属进程的实际可执行文件来自配置的 App。ChatGPT 只连接 `app://-/index.html` 和 detached window；ZCode 只连接配置安装目录中的 `app.asar/out/renderer/index.html`，排除辅助窗口、内置浏览器、插件、头像和预热页面。
 - HTTP 不允许重定向，WebSocket 必须是相同端口的 `ws://127.0.0.1`。
 - 对话文字只在渲染器内存中临时比较，不传回 Node，不写入日志、不发送到网络，不保存 Token 总数。
 - CDP 没有认证，同一 Mac 的其他本地进程也可能访问它。监听本机避免局域网访问，但不隔离本机进程。用完可退出 App 关闭端口。
@@ -71,6 +103,7 @@ CDP 是 App 的启动参数：关闭注入器不会关闭端口。需要关闭�
 - `src/cdp.mjs`：自有 CDP 客户端与本机地址核验。
 - `src/daemon.mjs`：多窗口发现、重连、重载注入。
 - `src/cli.mjs`：安装、启动、关闭、卸载、诊断。
+- `src/config.mjs`：ChatGPT / ZCode 默认配置与独立安装路径。
 - `test/`：单元测试和实际 Chromium 自动化测试，无 npm 测试依赖。
 
 `npm run doctor` 查看 App 与 CDP 状态。默认端口 9333。自定义安装可用 `node src/cli.mjs install --config /absolute/config.json`：
@@ -92,3 +125,7 @@ CDP 是 App 的启动参数：关闭注入器不会关闭端口。需要关闭�
 ## 0.1.2 更新
 
 根据用户需求，回复完成、停止、工具停顿或下一轮等待期间，保留当前对话最近一次测得的输出速度。新一轮可测输出会更新它；未测速的对话显示 `— tok/s`，不会借用其他对话的速度。仅保留数值，既有消息仍不计入。
+
+## 0.2.0 更新
+
+加入 ZCode 页面适配和独立安装、启动、诊断、关闭及卸载入口；保留 ChatGPT 既有安装目录与命令。通过实际可执行文件核验端口归属，支持 ZCode 修改进程标题的行为。`npm run test:browser` 同时检查 ChatGPT/Codex 和 ZCode 结构测试页。
