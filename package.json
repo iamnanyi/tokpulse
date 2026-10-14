@@ -1,0 +1,23 @@
+{
+  "name": "tokpulse",
+  "version": "0.1.2",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs start",
+    "doctor": "node src/cli.mjs doctor",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node test/browser.mjs",
+    "install:auto": "node src/cli.mjs install",
+    "stop": "node src/cli.mjs stop",
+    "uninstall": "node src/cli.mjs uninstall"
+  },
+  "description": "A lightweight, native-style estimated token speed bar for ChatGPT and Codex on macOS.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iamnanyi/tokpulse.git"
+  }
+}

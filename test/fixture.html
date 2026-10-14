@@ -1,0 +1,32 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Token Speed 本地验证页</title>
+<style>
+:root{color-scheme:light dark;--color-text-tertiary:#777}*{box-sizing:border-box}
+body{margin:0;background:#fafafa;color:#171717;font:14px -apple-system,BlinkMacSystemFont,sans-serif}
+body.dark{background:#202020;color:#eee;--color-text-tertiary:#aaa}
+main{display:flex;flex-direction:column;height:100vh;width:min(760px,100%);margin:auto;padding:24px;gap:16px}
+header{font-size:20px;font-weight:600}#messages{flex:1;min-height:0;overflow:auto;padding:12px;border:1px solid #8884;border-radius:12px}
+.message{padding:12px}.user{background:#8882;border-radius:8px}h4.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+form{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+[data-composer-surface-variant]{padding:12px;border:1px solid #8885;border-radius:20px;background:#8881}
+[contenteditable]{min-height:42px;outline:none}button{font:inherit;border:0;border-radius:14px;padding:7px 12px;background:#8883;cursor:pointer}
+.controls{display:flex;justify-content:space-between;gap:8px}
+</style>
+<main id="conversation"><header>ChatGPT Token Speed · 布局验证</header><div id="messages" data-thread-user-message-navigation-content>
+<div class="message user" data-user-message-bubble>历史用户输入，不应计速。</div>
+<div class="message" data-content-search-unit-key="history"><h4 class="sr-only" data-conversation-role="assistant">ChatGPT said:</h4><span>历史助手消息，不应计速。</span></div>
+<div class="message" data-content-search-unit-key="live"><h4 class="sr-only" data-conversation-role="assistant">ChatGPT said:</h4><span id="answer"></span></div>
+</div>
+<form data-chatgpt-composer data-thread-find-composer="true"><div data-composer-surface-variant="default"><div contenteditable="true" role="textbox">输入任何问题……</div><div class="controls"><button type="button" aria-label="Add">＋</button><button id="submit" type="button" aria-label="Send">↑</button></div></div></form>
+</main>
+<script>
+const fixtureInitialMessages=document.querySelector('#messages').innerHTML;
+window.fixture={
+ start(){document.querySelector('#submit').setAttribute('aria-label','Stop')},
+ stop(){document.querySelector('#submit').setAttribute('aria-label','Send')},
+ append(t){document.querySelector('#answer').append(t)},
+ work(){document.querySelector('#answer').closest('[data-content-search-unit-key]').setAttribute('data-talvt-turn-state','in_progress');document.querySelector('#answer').setAttribute('data-markdown-text-style','assistant-message')},
+ switch(){document.querySelector('#messages').innerHTML='<div data-content-search-turn-key="new-turn"><div data-content-search-unit-key="other"><h4 data-conversation-role="assistant" class="sr-only">ChatGPT said:</h4><span id="answer">另一对话的已有消息</span></div></div>'},
+ switchBack(){document.querySelector('#messages').innerHTML=fixtureInitialMessages},
+ geometry(){const rect=e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom}};return{viewport:[innerWidth,innerHeight],messages:rect(document.querySelector('#messages')),surface:rect(document.querySelector('[data-composer-surface-variant]')),buttons:[...document.querySelectorAll('button')].map(rect),bar:document.querySelector('[data-token-speed-bar]')?rect(document.querySelector('[data-token-speed-bar]')):null}}
+};
+</script></html>
